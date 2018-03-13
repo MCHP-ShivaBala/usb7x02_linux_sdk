@@ -1,0 +1,106 @@
+------------------------------------------------------------------------------
+
+This is the README file for SPI Bridging DEMO.
+
+$Id$
+
+vim: spelllang=en spell tw=78
+
+------------------------------------------------------------------------------
+
+Contents:
+1) General Information
+2) Requirements
+3) Building and installing
+5) License
+
+
+------------------------------------------------------------------------------
+
+1) General Information
+======================
+
+This project can be used for 4604 SPI Bridging demo.
+
+
+------------------------------------------------------------------------------
+
+2) Requirements
+===============
+
+1) Software requirements
+libusb 1.0
+libpt2.a
+2) Hardware requirements
+	USB4604.
+	USB2.0 host controller.
+Connect the hub to the usb port and check whether it has enumerated properly.This can be done by using lsusb command
+
+$lsusb
+	
+	Bus 001 Device 062: ID 0424:2530 Standard Microsystems Corp. 
+	Bus 001 Device 061: ID 0424:4504 Standard Microsystems Corp. 
+	Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+	Bus 005 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
+	Bus 004 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
+	Bus 003 Device 002: ID 413c:2106 Dell Computer Corp. Dell QuietKey Keyboard
+	Bus 003 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
+	Bus 002 Device 002: ID 0461:4e22 Primax Electronics, Ltd 
+	Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
+
+ 0424 is the microchip(smsc) hub.
+------------------------------------------------------------------------------
+
+3) Building and installing
+==========================
+$sudo su
+$ make
+	=============
+	Compiling spi_bridging.cpp
+	=============
+	Creating spiBridging
+
+
+	It will create a folder out, and and on successful compilation it will generate spiBridging.
+$cd out.
+./spiBridging --help
+Operation : Write 
+Usage: ./spiBridging VID(Hex) PID(Hex) Devicepath(string) Operation(0x01) FirmwareFile 
+Example: ./spiBridging 0x0424 0x4504 "2:1:1" 0x01 USB2534_SPI_CARPLAY_V128.bin
+
+Operation : Read
+Usage : ./spiBridging VID(Hex) PID(Hex) Devicepath(string) Operation(0x00) StartAddress Length
+Example: ./spiBridging 0x0424 0x4504 "2:1:1" 0x00 0x00 4
+
+Operation : Transfer
+Usage: ./spiBridging VID(Hex) PID(Hex) Devicepath(string) Operation(0x03) Command DataLength TotalLength
+Example: ./spiBridging 0x0424 0x4504 "2:1:1" 0x03 0x9f 1 4 
+
+Tested firmware: USB2534_SPI_CARPLAY_V128.bin
+------------------------------------------------------------------------------
+
+
+5) License
+==========
+**********************************************************************************
+* © 2015 Microchip Technology Inc. and its subsidiaries.
+* You may use this software and any derivatives exclusively with
+* Microchip products.
+* THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS".
+* NO WARRANTIES, WHETHER EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE,
+* INCLUDING ANY IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY,
+* AND FITNESS FOR A PARTICULAR PURPOSE, OR ITS INTERACTION WITH MICROCHIP
+* PRODUCTS, COMBINATION WITH ANY OTHER PRODUCTS, OR USE IN ANY APPLICATION.
+* IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
+* INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
+* WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
+* BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE.
+* TO THE FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL
+* CLAIMS IN ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF
+* FEES, IF ANY, THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
+* MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE
+* OF THESE TERMS.
+
+------------------------------------------------------------------------------
+
+
