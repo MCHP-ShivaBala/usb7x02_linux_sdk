@@ -45,12 +45,12 @@ HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 #define MICROCHIP_HUB_VID						0x424
 
 #define VID_MICROCHIP							0x0424
-// #define PID_HCE_DEVICE						0x4940
 
 #define CMD_DEV_RESET                       0x29
 
 #define CMD_SPI_PASSTHRU_ENTER				0x60  //SB
 #define CMD_SPI_PASSTHRU_EXIT				0x62  //SB
+#define CMD_SPI_PASSTHRU_WRITE              0x61
 
 //OTP
 #define OTP_DATA_START_ADDRESS						0x0002
@@ -82,6 +82,7 @@ HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 #define CHIP_ERASE							0xC7
 #define PAGE_PROG							0x02
 #define HS_READ                             0x0B
+#define RSTQIO                              0xFF
 
 //OTP
 // typedef struct tagOtpCfgChecksumA
@@ -122,7 +123,7 @@ HINFO gasHubInfo [MAX_HUBS];
 /* Context Variable used for initializing LibUSB session */
 libusb_context *ctx = NULL;
 /*List of possible PIDs for USB491X/USB471X HFCs*/
-uint16_t PID_HCE_DEVICE[HUB_SKUs] = {0x4940, 0x494A, 0x494B, 0x494C, 0x494E, 0x494F};
+uint16_t PID_HCE_DEVICE[HUB_SKUs] = {0x7040, 0x704A, 0x704B, 0x704C, 0x704E, 0x704F};
 
 /*-----------------------API functions --------------------------*/
 BOOL  MchpUsbGetVersion ( PCHAR pchVersionNo )
@@ -352,7 +353,15 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
     uint16_t NumPageReads = 0;
     // uint8_t RemainderBytes = 0;
     uint8_t byReadBuffer[READ_BLOCK_SIZE+5];
-    uint8_t byBuffer[4] = {0,0,0,0};
+    uint8_t byBuffer[5] = {0,0,0,0,0};
+
+    //Reset Quad IO
+    byBuffer[0] = RSTQIO;
+    if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
+    {
+        printf("SPI Transfer write failed \n");
+        exit (1);
+    }
 
     //Enable the SPI interface.
     if(FALSE == MchpUsbSpiSetConfig (DevID,1))
@@ -361,18 +370,36 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
         exit (1);
     }
 
+    //Read JEDEC ID
+    byBuffer[0] = READ_JEDEC_ID;
+    if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,4)) //write
+    {
+        printf("SPI Transfer write failed \n");
+        exit (1);
+    }
+
+    if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,4))
+    {
+        printf("SPI Transfer write failed \n");
+        exit (1);
+    }
+
+    printf("JEDEC ID: %02x %02x %02x %02x\n",byReadBuffer[0], byReadBuffer[1],
+                                            byReadBuffer[2], byReadBuffer[3]);
+
     NumPageReads = BytesToRead / READ_BLOCK_SIZE;
     // RemainderBytes = BytesToRead % READ_BLOCK_SIZE;
 
     for(uint16_t i=0; i<NumPageReads; i++)
     {
+        //Writing the HS_READ command //SB
         byBuffer[0] = HS_READ;
         byBuffer[1] = (StartAddr & 0xFF0000) >> 16; //SB
         byBuffer[2] = (StartAddr & 0x00FF00) >> 8; //SB
         byBuffer[3] = StartAddr & 0x0000FF; //SB
+        byBuffer[4] = 0;
 
-        //performs write operation to the SPI Interface.	//SB
-        if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,4,READ_BLOCK_SIZE+5)) //write
+        if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,5,READ_BLOCK_SIZE+5)) //write
         {
             printf("SPI Transfer write failed \n");
             exit (1);
@@ -386,7 +413,7 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
         }
 
         /*Copying the READ_BLOCK_SIZE of data read into local buffer for writing to binary file*/
-        memcpy((void *)&InputData[i*512], (const void *)&byReadBuffer[1], 512);
+        memcpy((void *)&InputData[i*512], (const void *)&byReadBuffer[0], 512);
 
         //Check if the flash is BUSY
         byBuffer[0] = RDSR;
@@ -462,12 +489,38 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
 		DEBUGPRINT("MchpUsbSpiFlashWrite Failed: BytesToWrite (%d) and StartAddr(0x%x) is larger than SPI memory size\n",BytesToWrite,StartAddr);
 		return bRet;
 	}
+
+    //Reset Quad IO
+    byBuffer[0] = RSTQIO;
+    if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
+    {
+        printf("SPI Transfer write failed \n");
+        exit (1);
+    }
+
     //Enable the SPI interface.
     if(FALSE == MchpUsbSpiSetConfig (DevID,1))
     {
         printf ("\nError: SPI Pass thru enter failed:\n");
         exit (1);
     }
+
+    //Read JEDEC ID
+    byBuffer[0] = READ_JEDEC_ID;
+    if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,4)) //write
+    {
+        printf("SPI Transfer write failed \n");
+        exit (1);
+    }
+
+    if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,4))
+    {
+        printf("SPI Transfer write failed \n");
+        exit (1);
+    }
+
+    printf("JEDEC ID: %02x %02x %02x %02x\n",byReadBuffer[0], byReadBuffer[1],
+                                            byReadBuffer[2], byReadBuffer[3]);
 
     //Unblock Global Protection
     byBuffer[0] = ULBPR;
@@ -638,13 +691,13 @@ BOOL MchpUsbSpiTransfer(HANDLE DevID,INT Direction,UINT8* Buffer, UINT16 DataLen
 
 	if(Direction) //Read
 	{
-		bRetVal = libusb_control_transfer((libusb_device_handle*)gasHubInfo[DevID].handle,0xC1,0x04,0x2310,0xBFD2,Buffer,
-								TotalLength,CTRL_TIMEOUT);
+		bRetVal = libusb_control_transfer((libusb_device_handle*)gasHubInfo[DevID].handle,0xC1,
+                    0x04,0x2310,0xBFD2,Buffer,TotalLength,CTRL_TIMEOUT);
 	}
 	else //Write
 	{
-		bRetVal = libusb_control_transfer((libusb_device_handle*)gasHubInfo[DevID].handle,0x41,0x61,TotalLength,0,Buffer,
-					DataLength,CTRL_TIMEOUT);
+		bRetVal = libusb_control_transfer((libusb_device_handle*)gasHubInfo[DevID].handle,0x41,
+                    CMD_SPI_PASSTHRU_WRITE,TotalLength,0,Buffer,DataLength,CTRL_TIMEOUT);
 	}
 	if(bRetVal <0 )
 	{
@@ -931,7 +984,6 @@ static int usb_get_hubs(PHINFO pHubInfoList)
 			uint8_t hub_desc[ 7 /* base descriptor */
 							+ 2 /* bitmasks */ * HUB_STATUS_BYTELEN];
 
-
 		  	error = libusb_open(device, &handle);
 			if(error < 0)
 			{
@@ -954,6 +1006,7 @@ static int usb_get_hubs(PHINFO pHubInfoList)
 				continue;
 			}
 		 	memset(hub_desc, 0, 9);
+
 
 			if(desc.bcdUSB == 0x0300)
 			{

@@ -20,7 +20,7 @@ HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 
 **********************************************************************************
 *   spi_bridging.cpp
-*   This file gives the sample code/ test code for using Mchp USB49xx/USB471x API
+*   This file gives the sample code/ test code for using Mchp USB70xx API
 *	Interface.
 **********************************************************************************
 *  $Revision:
@@ -50,7 +50,7 @@ int main (int argc, char* argv[])
 	char sztext[1024];
 
 	DWORD dwError = 0;
-	uint16_t vendor_id = 0x424 ,product_id= 0x4504;
+	uint16_t vendor_id = 0x424 ,product_id= 0x7002;
 	uint8_t byOperation;
     uint32_t byStartAddr = 0;
 	uint8_t hDevice =  INVALID_HANDLE_VALUE;
@@ -70,13 +70,13 @@ int main (int argc, char* argv[])
 	{
 		printf("Operation : Write \n");
 		printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x01) FirmwareFile \n");
-		printf("Example: ./spiBridging 0x424 0x4916 \"1:2\" 0x01 USB49XX_SILICON_CarLife_SPI_V1.27.bin \n \n");
+		printf("Example: ./spiBridging 0x424 0x7002 \"1:2\" 0x01 USB7x02_SILICON_SPI_V1.27.bin \n \n");
 		printf("Operation : Read \n");
 		printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x00) FirmwareFile \n");
-		printf("Example: ./spiBridging 0x424 0x4916 \"1:2\" 0x00 0x00 flash_dump.bin \n\n");
+		printf("Example: ./spiBridging 0x424 0x7002 \"1:2\" 0x00 0x00 flash_dump.bin \n\n");
 		printf("Operation : Transfer\n");
 		printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x03) Command DataLength TotalLength\n");
-		printf("Example: ./spiBridging 0x0424 0x4504 8 0x03 0x9f 1 4 \n\n");
+		printf("Example: ./spiBridging 0x0424 0x7002 8 0x03 0x9f 1 4 \n\n");
 		exit(1);
 
 	}
@@ -123,7 +123,7 @@ int main (int argc, char* argv[])
 	// 	exit (1);
 	// }
 
-    printf("\n***** MPLABConnect Linux SDK for USB49xx/USB471x *****\n");
+    printf("\n***** MPLABConnect Linux SDK for USB7x02 *****\n");
     printf("SPI Bridging Example\n\n");
 
 	memset(sztext,0,2048);
