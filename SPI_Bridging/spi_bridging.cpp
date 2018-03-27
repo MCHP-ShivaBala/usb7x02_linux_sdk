@@ -70,13 +70,13 @@ int main (int argc, char* argv[])
 	{
 		printf("Operation : Write \n");
 		printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x01) FirmwareFile \n");
-		printf("Example: ./spiBridging 0x424 0x7002 \"1:2\" 0x01 USB7x02_SILICON_SPI_V1.27.bin \n \n");
+		printf("Example: ./spiBridging 0x424 0x4002 \"1:2\" 0x01 USB7x02_SILICON_SPI_V1.27.bin \n \n");
 		printf("Operation : Read \n");
 		printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x00) FirmwareFile \n");
-		printf("Example: ./spiBridging 0x424 0x7002 \"1:2\" 0x00 0x00 flash_dump.bin \n\n");
+		printf("Example: ./spiBridging 0x424 0x4002 \"1:2\" 0x00 flash_dump.bin \n\n");
 		printf("Operation : Transfer\n");
 		printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x03) Command DataLength TotalLength\n");
-		printf("Example: ./spiBridging 0x0424 0x7002 8 0x03 0x9f 1 4 \n\n");
+		printf("Example: ./spiBridging 0x0424 0x4002 8 0x03 0x9f 1 4 \n\n");
 		exit(1);
 
 	}

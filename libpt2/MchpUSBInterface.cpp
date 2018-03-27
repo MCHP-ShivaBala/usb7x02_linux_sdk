@@ -43,7 +43,6 @@ HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 #define TRUE								1
 #define min(a,b)							(((a) < (b)) ? (a) : (b))
 #define MICROCHIP_HUB_VID						0x424
-
 #define VID_MICROCHIP							0x0424
 
 #define CMD_DEV_RESET                       0x29
@@ -355,13 +354,13 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
     uint8_t byReadBuffer[READ_BLOCK_SIZE+5];
     uint8_t byBuffer[5] = {0,0,0,0,0};
 
-    //Reset Quad IO
-    byBuffer[0] = RSTQIO;
-    if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
-    {
-        printf("SPI Transfer write failed \n");
-        exit (1);
-    }
+    // //Reset Quad IO
+    // byBuffer[0] = RSTQIO;
+    // if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
+    // {
+    //     printf("SPI Transfer write failed \n");
+    //     exit (1);
+    // }
 
     //Enable the SPI interface.
     if(FALSE == MchpUsbSpiSetConfig (DevID,1))
@@ -378,7 +377,7 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
         exit (1);
     }
 
-    if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,4))
+    if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer[0],0,4))
     {
         printf("SPI Transfer write failed \n");
         exit (1);
@@ -522,6 +521,15 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
     printf("JEDEC ID: %02x %02x %02x %02x\n",byReadBuffer[0], byReadBuffer[1],
                                             byReadBuffer[2], byReadBuffer[3]);
 
+    //WREN
+    byBuffer[0] = WREN;
+    //performs write operation to the SPI Interface.	//SB
+    if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
+    {
+        printf("SPI Transfer write failed \n");
+        exit (1);
+    }
+
     //Unblock Global Protection
     byBuffer[0] = ULBPR;
     if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
@@ -541,7 +549,7 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
 
     //Chip Erase
     byBuffer[0] = CHIP_ERASE;
-    if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
+    if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,1,1)) //write
     {
         printf("SPI Transfer write failed \n");
         exit (1);
@@ -549,22 +557,23 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
 
     //Busy wait on the erase operation
     byBuffer[0] = RDSR;
+    byBuffer[1] = 0;
     do
     {
         //performs write operation to the SPI Interface.	//SB
-        if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,2)) //write
+        if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,2,3)) //write
         {
             printf("SPI Transfer write failed \n");
             exit (1);
         }
-        if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,1))
+        if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,2))
         {
             printf("SPI Transfer read failed \n");
             exit (1);
         }
         DEBUGPRINT("Erasing the Block...\n");
 
-    }while(byReadBuffer[0] == 0x83);
+    }while((byReadBuffer[0] & 0x80)>>7);
 
     NumPageWrites = BytesToWrite / WRITE_BLOCK_SIZE;
     RemainderBytes = BytesToWrite % WRITE_BLOCK_SIZE;
@@ -618,17 +627,18 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
 
         //Check if the flash is BUSY
         byBuffer[0] = RDSR;
+        byBuffer[1] = 0;
         do
         {
 
             //performs write operation to the SPI Interface.	//SB
-            if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,2)) //write
+            if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],2,3)) //write
             {
                 printf("SPI Transfer write failed \n");
                 exit (1);
             }
 
-            if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,1))
+            if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,2))
             {
                 printf("SPI Transfer read failed \n");
                 exit (1);
@@ -636,7 +646,7 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
 
             DEBUGPRINT("Writing page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[0]);
 
-        }while(byReadBuffer[0] == 0x83);
+        }while((byReadBuffer[0] & 0x80)>>7);
 
         StartAddr += WRITE_BLOCK_SIZE;    //SB
 
