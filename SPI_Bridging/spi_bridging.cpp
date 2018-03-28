@@ -24,7 +24,7 @@ HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 *	Interface.
 **********************************************************************************
 *  $Revision:
-*  Description: Sample code for SPI Bridging
+*  Description: Sample code for SPI Bridging/Programming
 *  Author: Shiva Balasubramanian <shiva.balasubramanian@microchip.com>
 **********************************************************************************
 * $File:
@@ -39,7 +39,7 @@ HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 
 #include <cstdlib>
 
-// PT2 SDK API Header file
+// MPLABConnect SDK API Header file
 #include "MchpUSBInterface.h"
 #include "USBHubAbstraction.h"
 
@@ -60,8 +60,9 @@ int main (int argc, char* argv[])
 	int32_t wDataLength;
     char *sFirmwareFile;
 
-	uint8_t byBuffer[5] = {0,0,0,0}; //SB
-	uint16_t DataLen, wTotalLen;
+	// uint8_t byBuffer[5] = {0,0,0,0}; //SB
+    uint8_t byJedecIDBuffer[4] = {0,0,0,0};
+	// uint16_t DataLen, wTotalLen;
 
     char path[20] = {0};
 	uint8_t hub_count = 0;
@@ -74,9 +75,9 @@ int main (int argc, char* argv[])
 		printf("Operation : Read \n");
 		printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x00) FirmwareFile \n");
 		printf("Example: ./spiBridging 0x424 0x4002 \"1:2\" 0x00 flash_dump.bin \n\n");
-		printf("Operation : Transfer\n");
-		printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x03) Command DataLength TotalLength\n");
-		printf("Example: ./spiBridging 0x0424 0x4002 8 0x03 0x9f 1 4 \n\n");
+		// printf("Operation : Transfer\n");
+		// printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x03) Command DataLength TotalLength\n");
+		// printf("Example: ./spiBridging 0x0424 0x4002 8 0x03 0x9f 1 4 \n\n");
 		exit(1);
 
 	}
@@ -105,14 +106,14 @@ int main (int argc, char* argv[])
 		}
 		else if(byOperation == 0x03) //Transfer
 		{
-			byBuffer[0] = strtol (argv[5],NULL,0);	//SB
-			DataLen	 = strtol (argv[6],NULL,0);
-			wTotalLen = strtol (argv[7],NULL,0);
-
-            byStartAddr = strtol (argv[8], NULL, 0);    //SB
-            byBuffer[1] = (byStartAddr & 0xFF0000) >> 16; //SB
-            byBuffer[2] = (byStartAddr & 0x00FF00) >> 8; //SB
-            byBuffer[3] = byStartAddr & 0x0000FF; //SB
+			// byBuffer[0] = strtol (argv[5],NULL,0);	//SB
+			// DataLen	 = strtol (argv[6],NULL,0);
+			// wTotalLen = strtol (argv[7],NULL,0);
+            //
+            // byStartAddr = strtol (argv[8], NULL, 0);    //SB
+            // byBuffer[1] = (byStartAddr & 0xFF0000) >> 16; //SB
+            // byBuffer[2] = (byStartAddr & 0x00FF00) >> 8; //SB
+            // byBuffer[3] = byStartAddr & 0x0000FF; //SB
 		}
 	}
 
@@ -124,7 +125,7 @@ int main (int argc, char* argv[])
 	// }
 
     printf("\n***** MPLABConnect Linux SDK for USB7x02 *****\n");
-    printf("SPI Bridging Example\n\n");
+    printf("SPI Programming Example\n\n");
 
 	memset(sztext,0,2048);
 
@@ -137,18 +138,19 @@ int main (int argc, char* argv[])
 	}
 
 	//Return handle to the first instance of VendorID and ProductID matched device.
-	hDevice = MchpUsbOpen(vendor_id,product_id,path);
-
+    printf ("Opening the hub... \n\n");
+    hDevice = MchpUsbOpen(vendor_id,product_id,path);
 	if(INVALID_HANDLE_VALUE == hDevice)
 	{
 		printf ("\nError: MchpUsbOpenID Failed:\n");
 		exit (1);
 	}
-    printf ("MchpUsbOpenID successful... \n");
+    DEBUGPRINT("MchpUsbOpenID successful... \n\n");
 
     do
     {
         //find whether device boots from SPI ROM or Int ROM
+        printf("Gathering Hub Information...\n");
         get_hub_info(hDevice, (uint8_t *)&gasHubInfo[hDevice].sHubInfo);
 
         printf("Hub Silicon Revision: %02x\n", gasHubInfo[hDevice].sHubInfo.byDeviceRevision);
@@ -157,7 +159,7 @@ int main (int argc, char* argv[])
         if(gasHubInfo[hDevice].sHubInfo.byFeaturesFlag & 0x01)
         {
             bySpiRomBootflag = TRUE;
-            printf ("Hub executing from SPI ROM...Forcing Hub to boot from Int ROM... \n");
+            printf ("Hub executing from SPI ROM...Forcing Hub to boot from Int ROM... \n\n");
 
             //Force Booting from Internal ROM
             ForceBootFromRom(hDevice);
@@ -170,6 +172,7 @@ int main (int argc, char* argv[])
                 exit (1);
             }
 
+            printf ("Re-opening the hub... \n\n");
             //Re-opening the hub to get a new device handle
             hDevice = MchpUsbOpen(vendor_id,product_id,path);
             if(INVALID_HANDLE_VALUE == hDevice)
@@ -177,6 +180,8 @@ int main (int argc, char* argv[])
                 printf ("\nError: MchpUsbOpenID Failed:\n");
                 exit (1);
             }
+            DEBUGPRINT("MchpUsbOpenID successful... \n\n");
+
         }
         else
         {
@@ -189,6 +194,27 @@ int main (int argc, char* argv[])
     {
         printf ("Failed to force boot from ROM... \n");
         exit(1);
+    }
+
+    if(FALSE == GetJEDECID(hDevice, byJedecIDBuffer))
+    {
+        printf ("Failed to read the SPI Flash Manufacturer ID:\n");
+        exit (1);
+    }
+
+    if(byJedecIDBuffer[0] != MICROCHIP_SST_FLASH)
+    {
+        printf("Warning: Non-Microchip Flash are not supported. Operation might fail or have unexpected results\n");
+        printf("Do you wish to continue (Choose y or n):");
+        if(getchar() == 'n')
+        {
+            printf("Exiting...\n");
+            exit(1);
+        }
+        else
+        {
+            printf("\n");
+        }
     }
 
 	if(byOperation == 0x00) //Read
@@ -220,6 +246,22 @@ int main (int argc, char* argv[])
 			printf ("\nError: Write Failed:\n");
 			exit (1);
 		}
+
+        //Re-opening the hub to get a new device handle
+        hDevice = MchpUsbOpen(vendor_id,product_id,path);
+        if(INVALID_HANDLE_VALUE == hDevice)
+        {
+            printf ("\nError: MchpUsbOpenID Failed:\n");
+            exit (1);
+        }
+
+        //Checking Firmware version post programming
+        printf("Gathering Hub Information...\n");
+        get_hub_info(hDevice, (uint8_t *)&gasHubInfo[hDevice].sHubInfo);
+
+        printf("Hub Silicon Revision: %02x\n", gasHubInfo[hDevice].sHubInfo.byDeviceRevision);
+        printf("Hub Firmware Revision: %02x\n", gasHubInfo[hDevice].sHubInfo.wInternalFWRevision);
+
     }
 
 	//close device handle

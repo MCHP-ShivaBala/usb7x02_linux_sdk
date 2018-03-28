@@ -61,8 +61,9 @@ extern "C" {
 
 #define MY_MAX_PATH   						1024*8
 #define MAX_HUBS 						20
-#define CTRL_TIMEOUT 						(5*1000) /* milliseconds */
-#define MAX_FW_SIZE					        (256 * 1024)    //SB
+#define CTRL_TIMEOUT 					(5*1000) /* milliseconds */
+#define MAX_FW_SIZE					    (256 * 1024)    //SB
+#define MICROCHIP_SST_FLASH             0xBF
 
 // #define DEBUG
 #ifdef DEBUG
@@ -586,7 +587,7 @@ int MchpGetHubList(PCHAR HubInfo );
   Example
     <code>
 	CHAR sztext[2048];
-	uint8_t  pbyBuffer[128 * 1024];
+	uint8_t  pbyBuffer[256 * 1024];
 
     HANDLE hDevice =  INVALID_HANDLE_VALUE;
 
@@ -648,7 +649,7 @@ int MchpGetHubList(PCHAR HubInfo );
   Example
     <code>
 	CHAR sztext[2048];
-	uint8_t  pbyBuffer[128 * 1024];
+	uint8_t  pbyBuffer[256 * 1024];
 
     HANDLE hDevice =  INVALID_HANDLE_VALUE;
 
@@ -754,19 +755,151 @@ int MchpGetHubList(PCHAR HubInfo );
 // BOOL MchpProgramFile( HANDLE DevID, PCHAR InputFileName);
 
 
+/**************************************************************************************************
+  Function:
+        uint8_t ForceBootFromRom(HANDLE handle);
 
-/****
-***/
+  Summary:
+    Forces execution of code from Internal ROM.
+  Description:
+    This API will force a hub that is executing out of SPI ROM to reset and boot
+    from Internal ROM.
+  Conditions:
+    Hub needs to be open and should have a valid handle.
+  Input:
+    DevID - Handle to the device
+  Return:
+    TRUE - for Success;
+    FALSE - for failure
+  Example:
+    <code>
+    HANDLE hDevice = INVALID_HANDLE_VALUE;
+
+    hDevice = MchpUsbOpen(vendor_id,product_id,path);
+	if(INVALID_HANDLE_VALUE == hDevice)
+	{
+		printf ("\nError: MchpUsbOpenID Failed:\n");
+		exit (1);
+	}
+
+    get_hub_info(hDevice, (uint8_t *)&gasHubInfo[hDevice].sHubInfo);
+
+    if(gasHubInfo[hDevice].sHubInfo.byFeaturesFlag & 0x01)
+    {
+        printf ("Hub executing from SPI ROM...Forcing Hub to boot from Int ROM... \n\n");
+
+        //Force Booting from Internal ROM
+        ForceBootFromRom(hDevice);
+
+        //Releasing the existing device handle
+        if(FALSE == MchpUsbClose(hDevice))
+        {
+            dwError = MchpUsbGetLastErr(hDevice);
+            printf ("\nMchpUsbClose:Error Code,%04x\n",(unsigned int)dwError);
+            exit (1);
+        }
+
+        //Re-opening the hub to get a new device handle
+        hDevice = MchpUsbOpen(vendor_id,product_id,path);
+        if(INVALID_HANDLE_VALUE == hDevice)
+        {
+            printf ("\nError: MchpUsbOpenID Failed:\n");
+            exit (1);
+        }
+    }
+    </code>
+  Remarks:
+    None
+**************************************************************************************************/
 uint8_t ForceBootFromRom(HANDLE handle);
+/***************************************************************************************************************************
+  Function:
+	int get_hub_info(HANDLE handle, uint8_t *data);
 
+  Summary:
+    This API reads the hub information.
 
-/*get_hub_info
- * API used to get Hub details such as
- * Firmware type
- * ASIC Type
- * Device revision*
- * Featuresflag - Boots from ROM/SPI*/
+  Description:
+   This API reads the following information from a hub:
+       * API used to get Hub details such as
+       * Firmware type
+       * ASIC Type
+       * Device revision*
+       * Featuresflag - Boots from ROM/SPI
+
+  Conditions:
+    MchpUsbOpenID should be called before calling this API
+
+  Input:
+    DevID -        Handle to the device<p />
+    data  - Pointer to the buffer in which hub info needs to be stored
+  Return:
+    TRUE - for Success;
+    FALSE - for failure
+
+  Example:
+    <code>
+    HANDLE hDevice =  INVALID_HANDLE_VALUE;
+
+    hDevice = MchpUsbOpen(vendor_id,product_id,path);
+
+	if(INVALID_HANDLE_VALUE == hDevice)
+	{
+		printf ("\nError: MchpUsbOpenID Failed:\n");
+		exit (1);
+	}
+
+    get_hub_info(hDevice, (uint8_t *)&gasHubInfo[hDevice].sHubInfo);
+	</code>
+ ***************************************************************************************************************************/
 int get_hub_info(HANDLE handle, uint8_t *data);
+/**********************************************************************************************************************
+  Function:
+    BOOL GetJEDECID(HANDLE DevID, uint8_t *Buffer);
+
+  Summary:
+    This API performs reads the JEDEC ID of a SPI flash.
+
+  Description:
+    This API is uses low level SPI pass thru command to read the JEDEC ID.
+
+  Conditions:
+    MchpUsbOpenID should be called before calling this API
+
+  Input:
+    DevID -         Handle to the device<p />
+
+    Buffer -        Buffer that will stored  the JEDEC ID read from the SPI
+                    Flash. The JEDEC ID read returns a 4 byte value where the
+                    last byte is to be discarded.
+  Return:
+    TRUE - for Success;
+
+    FALSE - for failure
+
+  Example
+    <code>
+	uint8_t  Buffer[4];
+    HANDLE hDevice =  INVALID_HANDLE_VALUE;
+
+    hDevice = MchpUsbOpenID(0x424, 0x1234);
+    if(INVALID_HANDLE_VALUE == hDevice)
+    {
+        dwError = MchpUsbGetLastErr(hDevice);
+        printf ("Error,%04xn",dwError);
+        exit (1);
+    }
+    printf("Device Opened successfullyn");
+
+    if(FALSE == GetJEDECID(hDevice, Buffer))
+    {
+        printf ("Failed to read the SPI Flash Manufacturer ID:\n");
+        exit (1);
+    }
+    </code>
+***************************************************************************************************************************/
+BOOL GetJEDECID(HANDLE DevID, uint8_t *byBuffer);
+
 
 #ifdef __cplusplus
 }
