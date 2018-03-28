@@ -56,11 +56,11 @@ int main (int argc, char* argv[])
 	uint8_t hDevice =  INVALID_HANDLE_VALUE;
     uint8_t bySpiRomBootflag, byReboot = 0;
 
-    uint8_t  pbyBuffer[256 * 1024]; //SB
+    uint8_t  pbyBuffer[256 * 1024];
 	int32_t wDataLength;
     char *sFirmwareFile;
 
-	// uint8_t byBuffer[5] = {0,0,0,0}; //SB
+	// uint8_t byBuffer[5] = {0,0,0,0};
     uint8_t byJedecIDBuffer[4] = {0,0,0,0};
 	// uint16_t DataLen, wTotalLen;
 
@@ -102,18 +102,18 @@ int main (int argc, char* argv[])
 		else if(byOperation == 0x01) //Write
 		{
 			sFirmwareFile = argv[5];
-			byStartAddr = 0x00;				//SB
+			byStartAddr = 0x00;
 		}
 		else if(byOperation == 0x03) //Transfer
 		{
-			// byBuffer[0] = strtol (argv[5],NULL,0);	//SB
+			// byBuffer[0] = strtol (argv[5],NULL,0);
 			// DataLen	 = strtol (argv[6],NULL,0);
 			// wTotalLen = strtol (argv[7],NULL,0);
             //
-            // byStartAddr = strtol (argv[8], NULL, 0);    //SB
-            // byBuffer[1] = (byStartAddr & 0xFF0000) >> 16; //SB
-            // byBuffer[2] = (byStartAddr & 0x00FF00) >> 8; //SB
-            // byBuffer[3] = byStartAddr & 0x0000FF; //SB
+            // byStartAddr = strtol (argv[8], NULL, 0);
+            // byBuffer[1] = (byStartAddr & 0xFF0000) >> 16;
+            // byBuffer[2] = (byStartAddr & 0x00FF00) >> 8;
+            // byBuffer[3] = byStartAddr & 0x0000FF;
 		}
 	}
 
@@ -126,6 +126,10 @@ int main (int argc, char* argv[])
 
     printf("\n***** MPLABConnect Linux SDK for USB7x02 *****\n");
     printf("SPI Programming Example\n\n");
+    #ifdef DEBUG
+          DEBUGPRINT("DEBUG Mode: Enabled\n\n");
+    #endif
+
 
 	memset(sztext,0,2048);
 
@@ -222,14 +226,21 @@ int main (int argc, char* argv[])
         //Performs read operation from SPI Flash.
 		if(FALSE == MchpUsbSpiFlashRead(hDevice,byStartAddr,pbyBuffer,MAX_FW_SIZE))
 		{
-			printf ("\nError: Read Failed:\n");
-			exit (1);
+			printf ("\nError: Flash Read Failed: Booting from Internal ROM...\n");
+			// exit (1);
+            bySpiRomBootflag = FALSE;
 		}
+        else
+        {
+            bySpiRomBootflag = TRUE;
+        }
 
         if(writeBinfile(sFirmwareFile, pbyBuffer, MAX_FW_SIZE) < 0)
         {
             printf("Error: Failed to create binary file\n");
         }
+
+
 	}
 	else if(byOperation == 0x01)//Write
 	{
@@ -243,26 +254,60 @@ int main (int argc, char* argv[])
 		//Performs write opeartion to SPI Flash memory.
 		if(FALSE == MchpUsbSpiFlashWrite(hDevice,byStartAddr, pbyBuffer,wDataLength))
 		{
-			printf ("\nError: Write Failed:\n");
-			exit (1);
+			printf ("\nError: Flash Write Failed\n");
+			// exit (1);
+            bySpiRomBootflag = FALSE;
 		}
-
-        //Re-opening the hub to get a new device handle
-        hDevice = MchpUsbOpen(vendor_id,product_id,path);
-        if(INVALID_HANDLE_VALUE == hDevice)
+        else
         {
-            printf ("\nError: MchpUsbOpenID Failed:\n");
-            exit (1);
+            bySpiRomBootflag = TRUE;
+        }
+    }
+
+    //Reset the hub to run from SPI ROM if Flash Read/Write was successful
+    //else force boot from internal ROM
+    if(bySpiRomBootflag)
+    {
+        printf("Booting from SPI ROM...\n\n");
+        //Resetting the hub
+        if(FALSE == usb_reset_device(hDevice))
+        {
+            printf("Failed to Reset the hub\n");
+            exit(1);
         }
 
-        //Checking Firmware version post programming
-        printf("Gathering Hub Information...\n");
-        get_hub_info(hDevice, (uint8_t *)&gasHubInfo[hDevice].sHubInfo);
-
-        printf("Hub Silicon Revision: %02x\n", gasHubInfo[hDevice].sHubInfo.byDeviceRevision);
-        printf("Hub Firmware Revision: %02x\n", gasHubInfo[hDevice].sHubInfo.wInternalFWRevision);
-
+        //To allow time for the hub to boot up before performing another operation
+        sleep(3);
     }
+    else
+    {
+        printf("Booting from Internal ROM...\n\n");
+        //Force Booting from Internal ROM
+        ForceBootFromRom(hDevice);
+
+        //Releasing the existing device handle
+        if(FALSE == MchpUsbClose(hDevice))
+        {
+            dwError = MchpUsbGetLastErr(hDevice);
+            printf ("\nMchpUsbClose:Error Code,%04x\n",(unsigned int)dwError);
+            exit (1);
+        }
+    }
+
+    //Re-opening the hub to get a new device handle
+    hDevice = MchpUsbOpen(vendor_id,product_id,path);
+    if(INVALID_HANDLE_VALUE == hDevice)
+    {
+        printf ("\nError: MchpUsbOpenID Failed:\n");
+        exit (1);
+    }
+
+    //Checking Firmware version post programming
+    printf("Gathering Hub Information...\n");
+    get_hub_info(hDevice, (uint8_t *)&gasHubInfo[hDevice].sHubInfo);
+
+    printf("Hub Silicon Revision: %02x\n", gasHubInfo[hDevice].sHubInfo.byDeviceRevision);
+    printf("Hub Firmware Revision: %02x\n", gasHubInfo[hDevice].sHubInfo.wInternalFWRevision);
 
 	//close device handle
 	if(FALSE == MchpUsbClose(hDevice))

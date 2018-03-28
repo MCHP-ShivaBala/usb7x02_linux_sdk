@@ -59,10 +59,10 @@ extern "C" {
 #endif
 
 
-#define MY_MAX_PATH   						1024*8
+#define MY_MAX_PATH   					1024*8
 #define MAX_HUBS 						20
 #define CTRL_TIMEOUT 					(5*1000) /* milliseconds */
-#define MAX_FW_SIZE					    (256 * 1024)    //SB
+#define MAX_FW_SIZE					    (256 * 1024)    
 #define MICROCHIP_SST_FLASH             0xBF
 
 // #define DEBUG
@@ -899,6 +899,8 @@ int get_hub_info(HANDLE handle, uint8_t *data);
     </code>
 ***************************************************************************************************************************/
 BOOL GetJEDECID(HANDLE DevID, uint8_t *byBuffer);
+
+int usb_reset_device(HANDLE handle);
 
 
 #ifdef __cplusplus
