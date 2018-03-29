@@ -9,12 +9,12 @@ PROJECT = SPI_Bridging
 ############## For SPI Bridging demo #########################
 EXE_OUT = spiBridging
 
-CPP_SRC = spi_bridging.cpp 
+CPP_SRC = spi_bridging.cpp
 
 LIB_USB_PATH=$(shell pkg-config --cflags libusb-1.0)
-          
+
 #Include Paths
-INC_DIR = /usr/local/include/libusb-1.0 ../libpt2
+INC_DIR = /usr/local/include/libusb-1.0 ../MPLABConnect
 LIB_DIR = /usr/local/lib /usr/lib
 
 #Defnes
@@ -36,15 +36,15 @@ OBJS = $(CPP_SRC:.cpp=.o) $(GCC_SRC:.c=.o)
 
 # Libraries
 LIBS = -lusb-1.0 -lpthread -lm -ldl
- 
+
 # Flags
 CCFLAGS = -g -Wall $(LIB_USB_PATH) $(shell pkg-config --libs libusb-1.0)
-LDFLAGS = -g libpt2.a
- 
+LDFLAGS = -g MPLABConnect.a
+
 # Compiler
 CCC = $(CXX)
 GCC = CC
-#CCC = g++ -std=c++11 
+#CCC = g++ -std=c++11
 #GCC = gcc
 
 # Default targets
@@ -55,7 +55,7 @@ default: $(EXE_OUT) $(LIB_OUT)
 	@echo "============="
 	@echo "Compiling $<"
 	@$(CCC) $(INC_PATH) $(CCFLAGS) $(DEFINES) -c $< -o $(OBJ_DIR)/$(notdir $@)
- 
+
 .c.o:
 	@mkdir -p ./obj
 	@echo "============="
@@ -70,7 +70,7 @@ $(EXE_OUT): $(OBJS)
 
 $(LIB_OUT): $(OBJS)
 	@echo "============="
-	@mkdir -p ./out	
+	@mkdir -p ./out
 	@echo "Creating $(LIB_OUT)"
 	@ar rcs $(addprefix $(OUT_DIR)/, $(LIB_OUT)) $(addprefix $(OBJ_DIR)/, $(notdir $(OBJS)))
 
