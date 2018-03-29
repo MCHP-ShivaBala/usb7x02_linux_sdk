@@ -78,7 +78,7 @@ int main (int argc, char* argv[])
 		printf("Example: ./spiBridging 0x424 0x4002 \"1:2\" 0x00 flash_dump.bin \n\n");
 		printf("Operation : Transfer\n");
 		printf("Usage: ./spiBridging VID(Hex) PID(Hex) DevicePath(String) Operation(0x03) Direction(R/W: 1/0) Command DataLength TotalLength\n");
-		printf("Example: ./spiBridging 0x0424 0x4002 \"1:2\" 0x02 0 0x9f 1 4 \n\n");
+		printf("Example: ./spiBridging 0x0424 0x4002 \"1:2\" 0x02 0 0x9f 1 4 \n");
         printf("Example: ./spiBridging 0x0424 0x4002 \"1:2\" 0x02 1 0x9f 1 4 \n\n");
 		exit(1);
 	}
@@ -279,72 +279,6 @@ int main (int argc, char* argv[])
             exit (1);
 
     }
-
-	// if(byOperation == 0x00) //Read
-	// {
-    //     //Performs read operation from SPI Flash.
-	// 	if(FALSE == MchpUsbSpiFlashRead(hDevice,byStartAddr,pbyBuffer,MAX_FW_SIZE))
-	// 	{
-	// 		printf ("\nError: Flash Read Failed: Booting from Internal ROM...\n");
-	// 		// exit (1);
-    //         bySpiRomBootflag = FALSE;
-	// 	}
-    //     else
-    //     {
-    //         bySpiRomBootflag = TRUE;
-    //     }
-    //
-    //     if(writeBinfile(sFirmwareFile, pbyBuffer, MAX_FW_SIZE) < 0)
-    //     {
-    //         printf("Error: Failed to create binary file\n");
-    //     }
-    //
-    //
-	// }
-	// else if(byOperation == 0x01)//Write
-	// {
-	// 	//Read the content of the file.
-	// 	wDataLength = ReadBinfile(sFirmwareFile,pbyBuffer);
-	// 	if(wDataLength <=0)
-	// 	{
-	// 		printf("Failed to Read Content of File\n");
-	// 		exit (1);
-	// 	}
-	// 	//Performs write opeartion to SPI Flash memory.
-	// 	if(FALSE == MchpUsbSpiFlashWrite(hDevice,byStartAddr, pbyBuffer,wDataLength))
-	// 	{
-	// 		printf ("\nError: Flash Write Failed\n");
-	// 		// exit (1);
-    //         bySpiRomBootflag = FALSE;
-	// 	}
-    //     else
-    //     {
-    //         bySpiRomBootflag = TRUE;
-    //     }
-    // }
-    // else if(byOperation == 0x03)
-    // {
-    //     if(FALSE == MchpUsbSpiTransfer(hDevice, byDirection, byBuffer, DataLen, wTotalLen))
-    //     {
-    //         printf("SPI Transfer write failed \n");
-    //     }
-    //     if(byDirection)
-    //     {
-    //         printf("\nSPI Transfer Read Data: ");
-    //         for(uint8_t i=0; i<wTotalLen; i++)
-    //         {
-    //             printf("0x%02x  ", byBuffer[i]);
-    //         }
-    //         printf("\n");
-    //     }
-    //     bySpiRomBootflag = TRUE;
-    // }
-    // else
-    // {
-    //     printf("ERROR: Invalid Operation\n");
-	// 	printf("Use --help option for further details \n");
-	// 	exit (1);
-    // }
 
     //Reset the hub to run from SPI ROM if Flash Read/Write was successful
     //else force boot from internal ROM
