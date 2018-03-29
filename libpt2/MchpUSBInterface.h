@@ -62,7 +62,7 @@ extern "C" {
 #define MY_MAX_PATH   					1024*8
 #define MAX_HUBS 						20
 #define CTRL_TIMEOUT 					(5*1000) /* milliseconds */
-#define MAX_FW_SIZE					    (256 * 1024)    
+#define MAX_FW_SIZE					    (256 * 1024)
 #define MICROCHIP_SST_FLASH             0xBF
 
 // #define DEBUG
@@ -162,36 +162,6 @@ extern HINFO gasHubInfo [MAX_HUBS];
 
 /**************************************************************************************************
   Function:
-        BOOL  MchpUsbGetVersion ( PCHAR pchVersionNo );
-
-  Summary:
-    Get version no of the DLL.
-  Description:
-    This API will get the version no of the DLL
-  Conditions:
-    None.
-  Input:
-    pchVersionNo -  Pointer to the buffer where the version number of the
-                    DLL will be stored.
-  Return:
-    None.
-  Example:
-    <code>
-    CHAR sztext[2048];
-    if (FALSE == MchpUsbGetVersion(sztext))
-    {
-        printf ("nPress any key to exit....");
-        exit (1);
-    }
-    //Print version number here
-    cout \<\< sztext \<\< endl;
-    </code>
-  Remarks:
-    None
-  **************************************************************************************************/
- BOOL  MchpUsbGetVersion ( PCHAR pchVersionNo );
-/**************************************************************************************************
-  Function:
             UINT32 MchpUsbGetLastErr (HANDLE DevID);
 
   Summary:
@@ -248,54 +218,6 @@ extern HINFO gasHubInfo [MAX_HUBS];
   **************************************************************************************************/
 
 int MchpGetHubList(PCHAR HubInfo );
-
-/*********************************************************************************************************
-
-  Function:
-    HANDLE  MchpUsbOpenID ( UINT16 wVID, UINT16 wPID);
-
- Summary:
-    Open the device handle.
-
-  Description:
-    This API will return handle to the first instance of the HUB VID & PID matched device.
-
-  Conditions:
-    - None.
-
-  Input:
-    wVID -    Vendor ID(VID) of the Hub.
-	wPID -    Product ID(PID) of the Hub.
-  Return:
-    HANDLE of the Vendor ID and Product ID matched hub - for success
-
-    INVALID_HANDLE_VALUE (Call GetMchpUsbLastErr for more details) - for
-    failure
-
-  Example:
-    <code>
-
-
-    CHAR sztext[2048];
-
-    HANDLE hDevice = INVALID_HANDLE_VALUE;
-
-    UINT32 dwError;
-
-
-    hDevice = MchpUsbOpenID(0x424, 0x1234);
-    if(INVALID_HANDLE_VALUE == hDevice)
-    {
-        printf ("Error,%04xn",dwError);
-        exit (1);
-    }
-    printf("Device Opened successfullyn");
-    </code>
-  Remarks:
-    None
-  *********************************************************************************************************/
-
- HANDLE  MchpUsbOpenID ( UINT16 wVID, UINT16 wPID);
 
 /******************************************************************************************************
   Function:
@@ -499,7 +421,8 @@ int MchpGetHubList(PCHAR HubInfo );
     }
 	</code>
  ***************************************************************************************************************************/
-	BOOL MchpUsbSpiSetConfig ( HANDLE DevID, INT EnterExit);
+
+BOOL MchpUsbSpiSetConfig ( HANDLE DevID, INT EnterExit);
 
 /***************************************************************************************************************************
   Function:
@@ -555,7 +478,9 @@ int MchpGetHubList(PCHAR HubInfo );
 	}
 	</code>
  ***************************************************************************************************************************/
-	BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 BytesToRead);
+
+BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 BytesToRead);
+
 /***************************************************************************************************************************
   Function:
     BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT32 BytesToWrite)
@@ -611,7 +536,9 @@ int MchpGetHubList(PCHAR HubInfo );
 
 	</code>
  ***************************************************************************************************************************/
-	BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT32 BytesToWrite);
+
+BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT32 BytesToWrite);
+
 /**********************************************************************************************************************
   Function:
     BOOL MchpUsbSpiTransfer(HANDLE DevID,INT Direction,UINT8* Buffer, UINT16 DataLength,UINT32 TotalLength);
@@ -700,60 +627,8 @@ int MchpGetHubList(PCHAR HubInfo );
     </code>
 
  ***************************************************************************************************************************/
-	BOOL MchpUsbSpiTransfer(HANDLE DevID,INT Direction,UINT8* Buffer, UINT16 DataLength,UINT32 TotalLength);
 
-/******************************************************************************************************
-  Function:
-    BOOL MchpProgramFile( HANDLE DevID, PCHAR InputFileName);
-
-  Summary:
-    Program configuration file to the selected device ID
-
-  Description:
-    This API will program the configuration file given as argument to the
-    selected device ID.
-
-  Conditions:
-    MchpUsbOpenID should be called before calling this API
-
-  Input:
-    DevID -          Handle to the device
-    InputFileName -  \Input configuration file to be programmed into the
-                     device
-
-  Example
-    <code>
-	CHAR sztext[2048];
-
-	uint8_t  pbyBuffer[128 * 1024];
-
-
-    HANDLE hDevice =  INVALID_HANDLE_VALUE;
-
-    UINT32 dwError;
-
-
-    hDevice = MchpUsbOpenID(0x424, 0x1234);
-    if(INVALID_HANDLE_VALUE == hDevice)
-    {
-        dwError = MchpUsbGetLastErr(hDevice);
-        printf ("Error,%04xn",dwError);
-        exit (1);
-    }
-    printf("Device Opened successfullyn");
-
-    if(FALSE == MchpProgramFile(hDevice ,"MYcONFIG.BIN"))
-    {
-	printf("Programming Failed \n");
-	dwError = MchpUsbGetLastErr(hDevice);
-	printf ("Error,%04xn",dwError);
-	exit (1);
-    }
-   </code>
-
- ***************************************************************************************************************************/
-// BOOL MchpProgramFile( HANDLE DevID, PCHAR InputFileName);
-
+BOOL MchpUsbSpiTransfer(HANDLE DevID,INT Direction,UINT8* Buffer, UINT16 DataLength,UINT32 TotalLength);
 
 /**************************************************************************************************
   Function:
@@ -811,7 +686,9 @@ int MchpGetHubList(PCHAR HubInfo );
   Remarks:
     None
 **************************************************************************************************/
+
 uint8_t ForceBootFromRom(HANDLE handle);
+
 /***************************************************************************************************************************
   Function:
 	int get_hub_info(HANDLE handle, uint8_t *data);
@@ -852,7 +729,9 @@ uint8_t ForceBootFromRom(HANDLE handle);
     get_hub_info(hDevice, (uint8_t *)&gasHubInfo[hDevice].sHubInfo);
 	</code>
  ***************************************************************************************************************************/
+
 int get_hub_info(HANDLE handle, uint8_t *data);
+
 /**********************************************************************************************************************
   Function:
     BOOL GetJEDECID(HANDLE DevID, uint8_t *Buffer);
@@ -898,9 +777,13 @@ int get_hub_info(HANDLE handle, uint8_t *data);
     }
     </code>
 ***************************************************************************************************************************/
+
 BOOL GetJEDECID(HANDLE DevID, uint8_t *byBuffer);
 
-int usb_reset_device(HANDLE handle);
+/****
+****/
+
+int usb_reset_device(HANDLE DevID);
 
 
 #ifdef __cplusplus

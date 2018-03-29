@@ -51,11 +51,8 @@ HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 #define CMD_SPI_PASSTHRU_EXIT				0x62
 #define CMD_SPI_PASSTHRU_WRITE              0x61
 
-#define PT2_LIB_VER							"1.00"
-
 #define HUB_STATUS_BYTELEN						3 /* max 3 bytes status = hub + 23 ports */
 #define HUB_SKUs                                6
-
 
 #define logprint(x, ...) do { \
 		printf(__VA_ARGS__); \
@@ -80,7 +77,7 @@ static int compare_hubs(const void *p1, const void *p2);
 static int usb_get_hubs(PHINFO pHubInfoList);
 static int usb_get_hub_list(PCHAR pHubInfoList);
 static int usb_open_HCE_device(uint8_t hub_index);
-int  usb_send_vsm_command(struct libusb_device_handle *handle, uint8_t * byValue) ;
+int usb_send_vsm_command(struct libusb_device_handle *handle, uint8_t * byValue) ;
 int Read_OTP(HANDLE handle, uint16_t wAddress, uint8_t *data, uint16_t num_bytes);
 int Write_OTP(HANDLE handle, uint16_t wAddress, uint8_t *data, uint16_t num_bytes);
 int xdata_read(HANDLE handle, uint16_t wAddress, uint8_t *data, uint8_t num_bytes);
@@ -88,23 +85,14 @@ int xdata_write(HANDLE handle, uint32_t wAddress, uint8_t *data, uint8_t num_byt
 
  // Global variable for tracking the list of hubs
 HINFO gasHubInfo [MAX_HUBS];
+
 /* Context Variable used for initializing LibUSB session */
 libusb_context *ctx = NULL;
+
 /*List of possible PIDs for USB7x02 HFCs*/
 uint16_t PID_HCE_DEVICE[HUB_SKUs] = {0x7040, 0x704A, 0x704B, 0x704C, 0x704E, 0x704F};
 
 /*-----------------------API functions --------------------------*/
-BOOL  MchpUsbGetVersion ( PCHAR pchVersionNo )
-{
-	BOOL bRet = TRUE;
-
-	//Send command to lib to get library version
-	sprintf(pchVersionNo,"%s",PT2_LIB_VER);
-
-	return bRet;
-
-}
-
 // Get last error for the specific hub instance.
 UINT32 MchpUsbGetLastErr (HANDLE DevID)
 {
@@ -554,7 +542,7 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
         exit (1);
     }
 
-    //Reading the SPI Flash to compare it against the actual binary for
+    //Reading the SPI Flash to compare it against the programmed binary file for
     //verification
     printf("Verifying the flash...\n");
     //Performs read operation from SPI Flash.
