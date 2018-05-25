@@ -47,7 +47,7 @@ using namespace std;
 
 int main (int argc, char* argv[])
 {
-	char sztext[1024];
+	char sztext[2048];
 	DWORD dwError = 0;
 	uint16_t vendor_id = 0x424 ,product_id= 0x7002;
 	uint8_t byOperation;
@@ -55,13 +55,12 @@ int main (int argc, char* argv[])
 	uint8_t hDevice =  INVALID_HANDLE_VALUE;
     uint8_t bySpiRomBootflag, byReboot = 0;
 
-    uint8_t  pbyBuffer[256 * 1024];
+    uint8_t  pbyBuffer[MAX_FW_SIZE];
 	int32_t wDataLength;
     char *sFirmwareFile;
 
 	uint8_t byBuffer[4] = {0,0,0,0};
-    uint8_t byJedecIDBuffer[4] = {0,0,0,0};
-	uint16_t DataLen, wTotalLen;
+    uint16_t DataLen, wTotalLen;
     uint8_t byDirection;
     enum OpCode {READ = 0, WRITE, TRANSFER};
     char path[20] = {0};
@@ -189,27 +188,6 @@ int main (int argc, char* argv[])
         exit(1);
     }
 
-    if(FALSE == GetJEDECID(hDevice, byJedecIDBuffer))
-    {
-        printf ("Failed to read the SPI Flash Manufacturer ID:\n");
-        exit (1);
-    }
-
-    if(byJedecIDBuffer[0] != MICROCHIP_SST_FLASH)
-    {
-        printf("Warning: Non-Microchip Flash are not supported. Operation might fail or have unexpected results\n");
-        printf("Do you wish to continue (Choose y or n):");
-        if(getchar() == 'n')
-        {
-            printf("Exiting...\n");
-            exit(1);
-        }
-        else
-        {
-            printf("\n");
-        }
-    }
-
     switch(byOperation)
     {
         case READ :
@@ -256,6 +234,14 @@ int main (int argc, char* argv[])
 
         case TRANSFER :
 
+            //Enable the SPI interface.
+            if(FALSE == MchpUsbSpiSetConfig (hDevice,1))
+            {
+                printf ("\nError: SPI Pass thru enter failed:\n");
+                exit (1);
+            }
+
+            //SPI Passthrough transfer Read/Write
             if(FALSE == MchpUsbSpiTransfer(hDevice, byDirection, byBuffer, DataLen, wTotalLen))
             {
                 printf("SPI Transfer write failed \n");
@@ -269,7 +255,15 @@ int main (int argc, char* argv[])
                 }
                 printf("\n");
             }
-            bySpiRomBootflag = TRUE;
+
+            //Disable the SPI interface.
+            if(FALSE == MchpUsbSpiSetConfig (hDevice,0))
+            {
+                printf ("\nError: SPI Pass thru enter failed:\n");
+                exit (1);
+            }
+
+            bySpiRomBootflag = FALSE;
             break;
 
         default :

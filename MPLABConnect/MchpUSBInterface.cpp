@@ -62,10 +62,10 @@ HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 #define WRITE_BLOCK_SIZE                    256
 #define READ_BLOCK_SIZE                     512
 #define READ_JEDEC_ID					    0x9F
-#define	WREN							    0x06
-#define WRDIS                               0X04
-#define	RDSR								0x05
-#define ULBPR								0x98
+#define	WREN							    0x06 //Write latch enable
+#define WRDIS                               0X04 //Write latch disable
+#define	RDSR								0x05 //Read Status Reg
+#define ULBPR								0x98 //Unblock Global Protection
 #define CHIP_ERASE							0xC7
 #define PAGE_PROG							0x02
 #define HS_READ                             0x0B
@@ -80,7 +80,7 @@ static int usb_open_HCE_device(uint8_t hub_index);
 int usb_send_vsm_command(struct libusb_device_handle *handle, uint8_t * byValue) ;
 int Read_OTP(HANDLE handle, uint16_t wAddress, uint8_t *data, uint16_t num_bytes);
 int Write_OTP(HANDLE handle, uint16_t wAddress, uint8_t *data, uint16_t num_bytes);
-int xdata_read(HANDLE handle, uint16_t wAddress, uint8_t *data, uint8_t num_bytes);
+int xdata_read(HANDLE handle, uint32_t wAddress, uint8_t *data, uint8_t num_bytes);
 int xdata_write(HANDLE handle, uint32_t wAddress, uint8_t *data, uint8_t num_bytes);
 
  // Global variable for tracking the list of hubs
@@ -172,7 +172,7 @@ HANDLE  MchpUsbOpen ( UINT16 wVID, UINT16 wPID,char* cDevicePath)
 
     	if(error < 0)
     	{
-        //enable 5th Endpoit
+        //enable 5th Endpoint
 		error = usb_enable_HCE_device(hub_index);
 
  	       if(error < 0)
@@ -255,13 +255,13 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
     uint8_t byReadBuffer[READ_BLOCK_SIZE+5];
     uint8_t byBuffer[5] = {0,0,0,0,0};
 
-    // //Reset Quad IO
-    // byBuffer[0] = RSTQIO;
-    // if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
-    // {
-    //     printf("SPI Transfer write failed \n");
-    //     exit (1);
-    // }
+    //Reset Quad IO
+    byBuffer[0] = RSTQIO;
+    if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
+    {
+        printf("SPI Transfer write failed \n");
+        exit (1);
+    }
 
     //Enable the SPI interface.
     if(FALSE == MchpUsbSpiSetConfig (DevID,1))
@@ -296,7 +296,7 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
         }
 
         /*Copying the READ_BLOCK_SIZE of data read into local buffer for writing to binary file*/
-        memcpy((void *)&InputData[i*512], (const void *)&byReadBuffer[0], 512);
+        memcpy((void *)&InputData[i*READ_BLOCK_SIZE], (const void *)&byReadBuffer[0], READ_BLOCK_SIZE);
 
         //Check if the flash is BUSY
         byBuffer[0] = RDSR;
@@ -380,6 +380,28 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
     {
         printf ("\nError: SPI Pass thru enter failed:\n");
         exit (1);
+    }
+
+    //Reading the JEDEC ID of the flash
+    if(FALSE == GetJEDECID(DevID, byBuffer))
+    {
+        printf ("Failed to read the SPI Flash Manufacturer ID:\n");
+        exit (1);
+    }
+
+    if(byBuffer[0] != MICROCHIP_SST_FLASH)
+    {
+        printf("Warning: Non-Microchip Flash are not supported. Operation might fail or have unexpected results\n");
+        printf("Do you wish to continue (Choose y or n):");
+        if(getchar() == 'n')
+        {
+            printf("Exiting...\n");
+            exit(1);
+        }
+        else
+        {
+            printf("\n");
+        }
     }
 
     //WREN
@@ -546,13 +568,13 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
     //verification
     printf("Verifying the flash...\n");
     //Performs read operation from SPI Flash.
-    if(FALSE == MchpUsbSpiFlashRead(DevID,0,byVerifyBuffer,MAX_FW_SIZE))
+    if(FALSE == MchpUsbSpiFlashRead(DevID,0,byVerifyBuffer, BytesToWrite))
     {
         printf ("SPI Flash Verification Read Failed\n");
         exit (1);
     }
 
-    if(0 == memcmp(byVerifyBuffer, OutputData, MAX_FW_SIZE))
+    if(0 == memcmp(byVerifyBuffer, OutputData, BytesToWrite))
 	{
 		printf("Flash Write Verification: Passed\n");
 		return TRUE;
@@ -1195,57 +1217,15 @@ int  usb_send_vsm_command(struct libusb_device_handle *handle, uint8_t * byValue
 	return rc;
 }
 
-int Read_OTP(HANDLE handle, uint16_t wAddress, uint8_t *data, uint16_t num_bytes)
-{
-	int bRetVal = FALSE;
-	USB_CTL_PKT UsbCtlPkt;
-
-	UsbCtlPkt.handle 	= (libusb_device_handle*)gasHubInfo[handle].handle;
-	UsbCtlPkt.byRequest = 0x01;
-	UsbCtlPkt.wValue 	= wAddress;
-	UsbCtlPkt.wIndex 	= 0;
-	UsbCtlPkt.byBuffer 	= data;
-	UsbCtlPkt.wLength 	= num_bytes;
-
-	bRetVal = usb_HCE_read_data (&UsbCtlPkt);
-	if(bRetVal< 0)
-	{
-		DEBUGPRINT("Read OTP failed %d\n",bRetVal);
-		return bRetVal;
-	}
-	return bRetVal;
-}
-
-int Write_OTP(HANDLE handle, uint16_t wAddress, uint8_t *data, uint16_t num_bytes)
-{
-	int bRetVal = FALSE;
-	USB_CTL_PKT UsbCtlPkt;
-
-	UsbCtlPkt.handle 	= (libusb_device_handle*)gasHubInfo[handle].handle;
-	UsbCtlPkt.byRequest = 0x00;
-	UsbCtlPkt.wValue 	= wAddress;
-	UsbCtlPkt.wIndex 	= 0;
-	UsbCtlPkt.byBuffer 	= data;
-	UsbCtlPkt.wLength 	= num_bytes;
-
-	bRetVal = usb_HCE_write_data (&UsbCtlPkt);
-	if(bRetVal< 0)
-	{
-		DEBUGPRINT("Execute write OTP command failed %d\n",bRetVal);
-		return bRetVal;
-	}
-	return bRetVal;
-}
-
-int xdata_read(HANDLE handle, uint16_t wAddress, uint8_t *data, uint8_t num_bytes)
+int xdata_read(HANDLE handle, uint32_t wAddress, uint8_t *data, uint8_t num_bytes)
 {
 	int bRetVal = FALSE;
 	USB_CTL_PKT UsbCtlPkt;
 
 	UsbCtlPkt.handle 	= (libusb_device_handle*)gasHubInfo[handle].handle;
 	UsbCtlPkt.byRequest 	= 0x04;
-	UsbCtlPkt.wValue 	= wAddress;
-	UsbCtlPkt.wIndex 	= 0;
+	UsbCtlPkt.wValue 	= (wAddress & 0xFFFF);
+	UsbCtlPkt.wIndex 	= ((wAddress & 0xFFFF0000) >> 16);
 	UsbCtlPkt.byBuffer 	= data;
 	UsbCtlPkt.wLength 	= num_bytes;
 
@@ -1267,24 +1247,6 @@ int xdata_write(HANDLE handle, uint32_t wAddress, uint8_t *data, uint8_t num_byt
 
 	bRetVal = usb_HCE_write_data (&UsbCtlPkt);
 	return bRetVal;
-}
-
-unsigned int CalculateNumberofOnes(unsigned int UINTVar)
-{
-	unsigned int N0OfOnes = 0;
-	do
-	{
-		if(0x0000 == UINTVar) // variable if zero then return 0
-			break;
-		// Now counts 1's
-		while(UINTVar)
-		{
-			N0OfOnes++;
-			UINTVar &= (UINTVar -1);
-		}
-	}while(false);
-
-	return N0OfOnes;
 }
 
 //Return handle to the first instance of VendorID &amp; ProductID matched device.

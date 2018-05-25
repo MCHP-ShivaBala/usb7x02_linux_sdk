@@ -780,8 +780,50 @@ int get_hub_info(HANDLE handle, uint8_t *data);
 
 BOOL GetJEDECID(HANDLE DevID, uint8_t *byBuffer);
 
-/****
-****/
+/***************************************************************************************************************************
+  Function:
+	int usb_reset_device(HANDLE DevID);
+
+  Summary:
+    This API can be used to reset the hub from the host.
+
+  Description:
+    This API issues an external soft reset to the hub causing the program counter
+    to jump to 0.
+
+  Conditions:
+    -sleep(3) should be added before performing another operation to allow the hub
+    to go through the startup process.
+
+  Input:
+    DevID - Handle to the device<p />
+
+  Return:
+    TRUE - for Success;
+    FALSE - for failure
+
+  Example:
+    <code>
+    HANDLE hDevice =  INVALID_HANDLE_VALUE;
+
+    hDevice = MchpUsbOpen(vendor_id,product_id,path);
+	if(INVALID_HANDLE_VALUE == hDevice)
+	{
+		printf ("\nError: MchpUsbOpenID Failed:\n");
+		exit (1);
+	}
+
+    //Resetting the hub
+    if(FALSE == usb_reset_device(hDevice))
+    {
+        printf("Failed to Reset the hub\n");
+        exit(1);
+    }
+
+    //To allow time for the hub to boot up before performing another operation
+    sleep(3);
+	</code>
+ ***************************************************************************************************************************/
 
 int usb_reset_device(HANDLE DevID);
 
