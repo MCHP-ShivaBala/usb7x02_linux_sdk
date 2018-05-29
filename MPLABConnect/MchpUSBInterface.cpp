@@ -289,21 +289,23 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
         }
 
         //Reading READ_BLOCK_SIZE bytes at a time
-        if(FALSE == MchpUsbSpiTransfer(DevID,1,(uint8_t *)&byReadBuffer,READ_BLOCK_SIZE,READ_BLOCK_SIZE+5)) //parameter3 is don't care
+        if(FALSE == MchpUsbSpiTransfer(DevID,1,(uint8_t *)&byReadBuffer,READ_BLOCK_SIZE,READ_BLOCK_SIZE+5)) //parameter 4 is don't care
         {
             printf("SPI Transfer read failed \n");
             exit (1);
         }
 
         /*Copying the READ_BLOCK_SIZE of data read into local buffer for writing to binary file*/
-        memcpy((void *)&InputData[i*READ_BLOCK_SIZE], (const void *)&byReadBuffer[0], READ_BLOCK_SIZE);
+        // memcpy((void *)&InputData[i*READ_BLOCK_SIZE], (const void *)&byReadBuffer[0], READ_BLOCK_SIZE);
+        memcpy((void *)&InputData[i*READ_BLOCK_SIZE], (const void *)&byReadBuffer[5], READ_BLOCK_SIZE);
 
         //Check if the flash is BUSY
         byBuffer[0] = RDSR;
+        byBuffer[1] = 0;
         do
         {
             //performs write operation to the SPI Interface.
-            if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,2)) //write
+            if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],2,3)) //write
             {
                 printf("SPI Transfer write failed \n");
                 exit (1);
@@ -314,9 +316,11 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
                 printf("SPI Transfer read failed \n");
                 exit (1);
             }
-            DEBUGPRINT("Reading page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[0]);
+            // DEBUGPRINT("Reading page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[0]);
+            DEBUGPRINT("Reading page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[1]);
 
-        }while(byReadBuffer[0] != 0x00);
+        //}while(byReadBuffer[0] != 0x00);
+        }while(byReadBuffer[1] & 0x01);
 
         StartAddr += READ_BLOCK_SIZE;
 
@@ -389,7 +393,8 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
         exit (1);
     }
 
-    if(byBuffer[0] != MICROCHIP_SST_FLASH)
+    //if(byBuffer[0] != MICROCHIP_SST_FLASH)
+    if(byBuffer[1] != MICROCHIP_SST_FLASH)
     {
         printf("Warning: Non-Microchip Flash are not supported. Operation might fail or have unexpected results\n");
         printf("Do you wish to continue (Choose y or n):");
@@ -455,7 +460,8 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
             printf("SPI Transfer read failed \n");
             exit (1);
         }
-    }while((byReadBuffer[0] & 0x80)>>7);
+    //}while((byReadBuffer[0] & 0x80)>>7);
+    }while(byReadBuffer[1] & 0x01);
     printf("DONE\n");
 
     NumPageWrites = BytesToWrite / WRITE_BLOCK_SIZE;
@@ -527,9 +533,11 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
                 exit (1);
             }
 
-            DEBUGPRINT("Writing page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[0]);
+            // DEBUGPRINT("Writing page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[0]);
+            DEBUGPRINT("Writing page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[1]);
 
-        }while((byReadBuffer[0] & 0x80)>>7);
+        //}while((byReadBuffer[0] & 0x80)>>7);
+        }while(byReadBuffer[1] & 0x01);
 
         StartAddr += WRITE_BLOCK_SIZE;
 
