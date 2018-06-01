@@ -78,8 +78,6 @@ static int usb_get_hubs(PHINFO pHubInfoList);
 static int usb_get_hub_list(PCHAR pHubInfoList);
 static int usb_open_HCE_device(uint8_t hub_index);
 int usb_send_vsm_command(struct libusb_device_handle *handle, uint8_t * byValue) ;
-int Read_OTP(HANDLE handle, uint16_t wAddress, uint8_t *data, uint16_t num_bytes);
-int Write_OTP(HANDLE handle, uint16_t wAddress, uint8_t *data, uint16_t num_bytes);
 int xdata_read(HANDLE handle, uint32_t wAddress, uint8_t *data, uint8_t num_bytes);
 int xdata_write(HANDLE handle, uint32_t wAddress, uint8_t *data, uint8_t num_bytes);
 
@@ -253,13 +251,54 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
     uint16_t NumPageReads = 0;
     // uint8_t RemainderBytes = 0;
     uint8_t byReadBuffer[READ_BLOCK_SIZE+5];
-    uint8_t byBuffer[5] = {0,0,0,0,0};
+    uint8_t byBuffer[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
 
     //Reset Quad IO
     byBuffer[0] = RSTQIO;
     if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
     {
         printf("SPI Transfer write failed \n");
+        exit (1);
+    }
+
+    //Reading the JEDEC ID of the flash
+    if(FALSE == GetJEDECID(DevID, byBuffer))
+    {
+        printf ("Failed to read the SPI Flash Manufacturer ID:\n");
+        exit (1);
+    }
+
+    //if(byBuffer[0] != MICROCHIP_SST_FLASH)
+    if(byBuffer[1] != MICROCHIP_SST_FLASH)
+    {
+        printf("Warning: Non-Microchip Flash are not supported. Operation might fail or have unexpected results\n");
+        printf("Do you wish to continue (Choose y or n):");
+        if(getchar() == 'n')
+        {
+            printf("Exiting...\n");
+            exit(1);
+        }
+        else
+        {
+            printf("\n");
+        }
+    }
+
+    //Reading the second byte of the 32-bit runtime flag register at BFD2_3408 to check bit 13
+    //for enabling Pass through function running from ROM
+    if(FALSE == xdata_read(DevID, 0xBFD23409, byBuffer, 1))
+    {
+        printf("Failed to read run time flag register \n");
+        exit (1);
+    }
+
+    //Setting Bit 13 in the register contents
+    byBuffer[0] |= (1 << 5);
+
+
+    if(FALSE == xdata_write(DevID, 0xBFD23409, byBuffer, 1))
+    {
+        printf("Failed to write run time flag register\n");
         exit (1);
     }
 
@@ -270,23 +309,51 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
         exit (1);
     }
 
+    // //Reading runtime flag register at BFD2_3409 to check bit 13 for enabling Pass
+    // //through function running from ROM
+    // if(FALSE == xdata_read(DevID, 0xBFD23409, byBuffer, 1))
+    // {
+    //     printf("SPI Transfer read failed \n");
+    //     exit (1);
+    // }
+
     NumPageReads = BytesToRead / READ_BLOCK_SIZE;
     // RemainderBytes = BytesToRead % READ_BLOCK_SIZE;
 
     for(uint16_t i=0; i<NumPageReads; i++)
     {
-        //Writing the HS_READ command
-        byBuffer[0] = HS_READ;
-        byBuffer[1] = (StartAddr & 0xFF0000) >> 16;
-        byBuffer[2] = (StartAddr & 0x00FF00) >> 8;
-        byBuffer[3] = StartAddr & 0x0000FF;
-        byBuffer[4] = 0;
+        // //Writing the HS_READ command
+        // byBuffer[0] = HS_READ;
+        // byBuffer[1] = (StartAddr & 0xFF0000) >> 16;
+        // byBuffer[2] = (StartAddr & 0x00FF00) >> 8;
+        // byBuffer[3] = StartAddr & 0x0000FF;
+        // byBuffer[4] = 0;
 
-        if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,5,READ_BLOCK_SIZE+5)) //write
+        //Creating the Data OUT packet for SETUP for SPI transfer read with auto
+        //polling of flash BUSY bit
+        byBuffer[0] = 'S'; //Signature
+        byBuffer[1] = 'P'; //Signature
+        byBuffer[2] = 'I'; //Signature
+        byBuffer[3] = 'D'; //Signature
+        byBuffer[4] = 0x01; //Busy Bit Mask
+        byBuffer[5] = RDSR; //Read Status opcode
+        byBuffer[6] = 0x00; //No of dummy bytes
+        byBuffer[7] = 0x01; //Response buffer index for polling BUSY bit
+        byBuffer[8] = HS_READ;// High Speed read instruction
+        byBuffer[9] = (StartAddr & 0xFF0000) >> 16;
+        byBuffer[10] = (StartAddr & 0x00FF00) >> 8;
+        byBuffer[11] = StartAddr & 0x0000FF;
+        byBuffer[12] = 0x00; //Dummy address byte
+
+        //Sending the SETUP packet for reading a Block
+        // if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,5,READ_BLOCK_SIZE+5)) //write
+        if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,13,READ_BLOCK_SIZE+5+13)) //write //B0
         {
             printf("SPI Transfer write failed \n");
             exit (1);
         }
+
+        DEBUGPRINT("Reading page %d at addr 0x%06x\n",i,StartAddr);
 
         //Reading READ_BLOCK_SIZE bytes at a time
         if(FALSE == MchpUsbSpiTransfer(DevID,1,(uint8_t *)&byReadBuffer,READ_BLOCK_SIZE,READ_BLOCK_SIZE+5)) //parameter 4 is don't care
@@ -299,28 +366,28 @@ BOOL MchpUsbSpiFlashRead(HANDLE DevID,UINT32 StartAddr,UINT8* InputData,UINT32 B
         // memcpy((void *)&InputData[i*READ_BLOCK_SIZE], (const void *)&byReadBuffer[0], READ_BLOCK_SIZE);
         memcpy((void *)&InputData[i*READ_BLOCK_SIZE], (const void *)&byReadBuffer[5], READ_BLOCK_SIZE);
 
-        //Check if the flash is BUSY
-        byBuffer[0] = RDSR;
-        byBuffer[1] = 0;
-        do
-        {
-            //performs write operation to the SPI Interface.
-            if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],2,3)) //write
-            {
-                printf("SPI Transfer write failed \n");
-                exit (1);
-            }
-
-            if(FALSE == MchpUsbSpiTransfer(DevID,1,(uint8_t *)&byReadBuffer,2,1)) //3rd Argument is don't care
-            {
-                printf("SPI Transfer read failed \n");
-                exit (1);
-            }
-            // DEBUGPRINT("Reading page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[0]);
-            DEBUGPRINT("Reading page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[1]);
+        // //Check if the flash is BUSY
+        // byBuffer[0] = RDSR;
+        // byBuffer[1] = 0;
+        // do
+        // {
+        //     //performs write operation to the SPI Interface.
+        //     if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],2,3)) //write
+        //     {
+        //         printf("SPI Transfer write failed \n");
+        //         exit (1);
+        //     }
+        //
+        //     if(FALSE == MchpUsbSpiTransfer(DevID,1,(uint8_t *)&byReadBuffer,2,1)) //3rd Argument is don't care
+        //     {
+        //         printf("SPI Transfer read failed \n");
+        //         exit (1);
+        //     }
+        //     // DEBUGPRINT("Reading page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[0]);
+            // DEBUGPRINT("Reading page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[1]);
 
         //}while(byReadBuffer[0] != 0x00);
-        }while(byReadBuffer[1] & 0x01);
+        // }while(byReadBuffer[1] & 0x01);
 
         StartAddr += READ_BLOCK_SIZE;
 
@@ -354,9 +421,11 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
 	BOOL bRet = FALSE;
     uint16_t NumPageWrites = 0;
     uint8_t RemainderBytes = 0;
-    uint8_t byWriteBuffer[WRITE_BLOCK_SIZE+4] = {PAGE_PROG};
+    // uint8_t byWriteBuffer[WRITE_BLOCK_SIZE+4] = {PAGE_PROG};
+    uint8_t byWriteBuffer[WRITE_BLOCK_SIZE+12];
     uint8_t byReadBuffer[2];
-    uint8_t byBuffer[4] = {0,0,0,0};
+    // uint8_t byBuffer[4] = {0,0,0,0};
+    uint8_t byBuffer[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
     uint8_t byVerifyBuffer[MAX_FW_SIZE];
 
 	if(nullptr == OutputData)
@@ -376,13 +445,6 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
     if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
     {
         printf("SPI Transfer write failed \n");
-        exit (1);
-    }
-
-    //Enable the SPI interface.
-    if(FALSE == MchpUsbSpiSetConfig (DevID,1))
-    {
-        printf ("\nError: SPI Pass thru enter failed:\n");
         exit (1);
     }
 
@@ -409,6 +471,31 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
         }
     }
 
+    //Reading the second byte of the 32-bit runtime flag register at BFD2_3408 to check bit 13
+    //for enabling Pass through function running from ROM
+    if(FALSE == xdata_read(DevID, 0xBFD23409, byBuffer, 1))
+    {
+        printf("Failed to read run time flag register \n");
+        exit (1);
+    }
+
+    //Setting Bit 13 in the register contents
+    byBuffer[0] |= (1 << 5);
+
+
+    if(FALSE == xdata_write(DevID, 0xBFD23409, byBuffer, 1))
+    {
+        printf("Failed to write run time flag register\n");
+        exit (1);
+    }
+
+    //Enable the SPI interface.
+    if(FALSE == MchpUsbSpiSetConfig (DevID,1))
+    {
+        printf ("\nError: SPI Pass thru enter failed:\n");
+        exit (1);
+    }
+
     //WREN
     byBuffer[0] = WREN;
     //performs write operation to the SPI Interface.
@@ -419,8 +506,20 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
     }
 
     //Unblock Global Protection
-    byBuffer[0] = ULBPR;
-    if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
+    // byBuffer[0] = ULBPR;
+
+    byBuffer[0] = 'S'; //Signature
+    byBuffer[1] = 'P'; //Signature
+    byBuffer[2] = 'I'; //Signature
+    byBuffer[3] = 'D'; //Signature
+    byBuffer[4] = 0x01; //Busy Bit Mask
+    byBuffer[5] = RDSR; //Read Status opcode
+    byBuffer[6] = 0x00; //No of dummy bytes
+    byBuffer[7] = 0x01; //Response buffer index for polling BUSY bit
+    byBuffer[8] = ULBPR;// Unblock Global Protection instruction
+
+    // if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],1,1)) //write
+    if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,9,9)) //write
     {
         printf("SPI Transfer write failed \n");
         exit (1);
@@ -436,46 +535,76 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
     }
 
     //Chip Erase
-    byBuffer[0] = CHIP_ERASE;
-    if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,1,1)) //write
+    // byBuffer[0] = CHIP_ERASE;
+
+    byBuffer[0] = 'S'; //Signature
+    byBuffer[1] = 'P'; //Signature
+    byBuffer[2] = 'I'; //Signature
+    byBuffer[3] = 'D'; //Signature
+    byBuffer[4] = 0x01; //Busy Bit Mask
+    byBuffer[5] = RDSR; //Read Status opcode
+    byBuffer[6] = 0x00; //No of dummy bytes
+    byBuffer[7] = 0x01; //Response buffer index for polling BUSY bit
+    byBuffer[8] = CHIP_ERASE; //Chip Erase Instruction
+
+    printf("\nErasing the SPI Flash...");
+    // if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,1,1)) //write
+    if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,9,9)) //write
     {
         printf("SPI Transfer write failed \n");
         exit (1);
     }
-    printf("\nErasing the SPI Flash...");
+    // printf("\nErasing the SPI Flash...");
 
-    //Busy wait on the erase operation
-    byBuffer[0] = RDSR;
-    byBuffer[1] = 0;
-    do
-    {
-        //performs write operation to the SPI Interface.
-        if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,2,3)) //write
-        {
-            printf("SPI Transfer write failed \n");
-            exit (1);
-        }
-        if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,2))
-        {
-            printf("SPI Transfer read failed \n");
-            exit (1);
-        }
-    //}while((byReadBuffer[0] & 0x80)>>7);
-    }while(byReadBuffer[1] & 0x01);
+    // //Busy wait on the erase operation
+    // byBuffer[0] = RDSR;
+    // byBuffer[1] = 0;
+    // do
+    // {
+    //     //performs write operation to the SPI Interface.
+    //     if(FALSE == MchpUsbSpiTransfer(DevID,0,byBuffer,2,3)) //write
+    //     {
+    //         printf("SPI Transfer write failed \n");
+    //         exit (1);
+    //     }
+    //     if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,2))
+    //     {
+    //         printf("SPI Transfer read failed \n");
+    //         exit (1);
+    //     }
+    // //}while((byReadBuffer[0] & 0x80)>>7);
+    // }while(byReadBuffer[1] & 0x01);
     printf("DONE\n");
 
     NumPageWrites = BytesToWrite / WRITE_BLOCK_SIZE;
     RemainderBytes = BytesToWrite % WRITE_BLOCK_SIZE;
 
+    byWriteBuffer[0] = 'S'; //Signature
+    byWriteBuffer[1] = 'P'; //Signature
+    byWriteBuffer[2] = 'I'; //Signature
+    byWriteBuffer[3] = 'D'; //Signature
+    byWriteBuffer[4] = 0x01; //Busy Bit Mask
+    byWriteBuffer[5] = RDSR; //Read Status opcode
+    byWriteBuffer[6] = 0x00; //No of dummy bytes
+    byWriteBuffer[7] = 0x01; //Response buffer index for polling BUSY bit
+    byWriteBuffer[8] = PAGE_PROG; //Page Program Instruction
 
     for (uint16_t i=0; i<=NumPageWrites; i++)
     {
 
-        byWriteBuffer[1] = (StartAddr & 0xFF0000) >> 16;
-        byWriteBuffer[2] = (StartAddr & 0x00FF00) >> 8;
-        byWriteBuffer[3] = StartAddr & 0x0000FF;
+        // byWriteBuffer[1] = (StartAddr & 0xFF0000) >> 16;
+        // byWriteBuffer[2] = (StartAddr & 0x00FF00) >> 8;
+        // byWriteBuffer[3] = StartAddr & 0x0000FF;
 
-        memcpy((void *)&byWriteBuffer[4], (const void *)&OutputData[i*WRITE_BLOCK_SIZE],
+
+        byWriteBuffer[9] = (StartAddr & 0xFF0000) >> 16;
+        byWriteBuffer[10] = (StartAddr & 0x00FF00) >> 8;
+        byWriteBuffer[11] = StartAddr & 0x0000FF;
+
+
+        // memcpy((void *)&byWriteBuffer[4], (const void *)&OutputData[i*WRITE_BLOCK_SIZE],
+        //                                                                 WRITE_BLOCK_SIZE);
+        memcpy((void *)&byWriteBuffer[12], (const void *)&OutputData[i*WRITE_BLOCK_SIZE],
                                                                         WRITE_BLOCK_SIZE);
 
         //WREN
@@ -487,13 +616,17 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
             exit (1);
         }
 
+        DEBUGPRINT("Writing page %d at addr 0x%06x\n",i,StartAddr);
+
         if(i == NumPageWrites)
         {
             /*Copying the remaining binary data into write buffer when data lenth < WRITE_BLOCK_SIZE bytes*/
-            memcpy((void *)&byWriteBuffer[4], (const void *)&OutputData[i*WRITE_BLOCK_SIZE], RemainderBytes);
+            // memcpy((void *)&byWriteBuffer[4], (const void *)&OutputData[i*WRITE_BLOCK_SIZE], RemainderBytes);
+            memcpy((void *)&byWriteBuffer[12], (const void *)&OutputData[i*WRITE_BLOCK_SIZE], RemainderBytes);
 
             /*Writing a remaining bytes in the last page*/
-            if(FALSE == MchpUsbSpiTransfer(DevID,0,byWriteBuffer,RemainderBytes+4,RemainderBytes+4)) //write
+            // if(FALSE == MchpUsbSpiTransfer(DevID,0,byWriteBuffer,RemainderBytes+4,RemainderBytes+4)) //write
+            if(FALSE == MchpUsbSpiTransfer(DevID,0,byWriteBuffer,RemainderBytes+12,RemainderBytes+12)) //write
             {
                 printf("SPI Transfer write failed \n");
                 exit (1);
@@ -503,41 +636,44 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
         else
         {
             /*Copying a page length of binary data into write buffer*/
-            memcpy((void *)&byWriteBuffer[4], (const void *)&OutputData[i*WRITE_BLOCK_SIZE],
+            // memcpy((void *)&byWriteBuffer[4], (const void *)&OutputData[i*WRITE_BLOCK_SIZE],
+            //                                                                 WRITE_BLOCK_SIZE);
+            memcpy((void *)&byWriteBuffer[12], (const void *)&OutputData[i*WRITE_BLOCK_SIZE],
                                                                             WRITE_BLOCK_SIZE);
 
             /*Writing a WRITE_BLOCK_SIZE byte page*/
-            if(FALSE == MchpUsbSpiTransfer(DevID,0,byWriteBuffer,WRITE_BLOCK_SIZE+4,WRITE_BLOCK_SIZE+4)) //write
+            // if(FALSE == MchpUsbSpiTransfer(DevID,0,byWriteBuffer,WRITE_BLOCK_SIZE+4,WRITE_BLOCK_SIZE+4)) //write
+            if(FALSE == MchpUsbSpiTransfer(DevID,0,byWriteBuffer,WRITE_BLOCK_SIZE+12,WRITE_BLOCK_SIZE+12)) //write
             {
                 printf("SPI Transfer write failed \n");
                 exit (1);
             }
         }
 
-        //Check if the flash is BUSY
-        byBuffer[0] = RDSR;
-        byBuffer[1] = 0;
-        do
-        {
-
-            //performs write operation to the SPI Interface.
-            if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],2,3)) //write
-            {
-                printf("SPI Transfer write failed \n");
-                exit (1);
-            }
-
-            if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,2))
-            {
-                printf("SPI Transfer read failed \n");
-                exit (1);
-            }
-
-            // DEBUGPRINT("Writing page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[0]);
-            DEBUGPRINT("Writing page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[1]);
-
-        //}while((byReadBuffer[0] & 0x80)>>7);
-        }while(byReadBuffer[1] & 0x01);
+        // //Check if the flash is BUSY
+        // byBuffer[0] = RDSR;
+        // byBuffer[1] = 0;
+        // do
+        // {
+        //
+        //     //performs write operation to the SPI Interface.
+        //     if(FALSE == MchpUsbSpiTransfer(DevID,0,&byBuffer[0],2,3)) //write
+        //     {
+        //         printf("SPI Transfer write failed \n");
+        //         exit (1);
+        //     }
+        //
+        //     if(FALSE == MchpUsbSpiTransfer(DevID,1,(UINT8 *)&byReadBuffer,0,2))
+        //     {
+        //         printf("SPI Transfer read failed \n");
+        //         exit (1);
+        //     }
+        //
+        //     // DEBUGPRINT("Writing page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[0]);
+        //     DEBUGPRINT("Writing page %d at addr 0x%06x...SR = %02x\n",i,StartAddr,byReadBuffer[1]);
+        //
+        // //}while((byReadBuffer[0] & 0x80)>>7);
+        // }while(byReadBuffer[1] & 0x01);
 
         StartAddr += WRITE_BLOCK_SIZE;
 
@@ -593,7 +729,8 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
 
         #ifdef DEBUG
               DEBUGPRINT("Generating flash_verify_fail.bin for debugging\n");
-		      writeBinfile("flash_verify_fail.bin", byVerifyBuffer, MAX_FW_SIZE);
+		      // writeBinfile("flash_verify_fail.bin", byVerifyBuffer, MAX_FW_SIZE);
+              writeBinfile("flash_verify_fail.bin", byVerifyBuffer, BytesToWrite);
         #endif
 
         return FALSE;
@@ -616,8 +753,17 @@ BOOL MchpUsbSpiTransfer(HANDLE DevID,INT Direction,UINT8* Buffer, UINT16 DataLen
 	}
 	else //Write
 	{
-		bRetVal = libusb_control_transfer((libusb_device_handle*)gasHubInfo[DevID].handle,0x41,
-                    CMD_SPI_PASSTHRU_WRITE,TotalLength,0,Buffer,DataLength,CTRL_TIMEOUT);
+        //Checking for SPI signature to enable non-zero wValue transfers
+        if(Buffer[0] == 'S' && Buffer[1] =='P'&& Buffer[2] == 'I' && Buffer[3] == 'D' )
+        {
+            bRetVal = libusb_control_transfer((libusb_device_handle*)gasHubInfo[DevID].handle,0x41,
+                        CMD_SPI_PASSTHRU_WRITE,TotalLength,0x0400,Buffer,DataLength,CTRL_TIMEOUT);
+        }
+        else
+        {
+            bRetVal = libusb_control_transfer((libusb_device_handle*)gasHubInfo[DevID].handle,0x41,
+                CMD_SPI_PASSTHRU_WRITE,TotalLength,0,Buffer,DataLength,CTRL_TIMEOUT);
+        }
 	}
 	if(bRetVal <0 )
 	{
