@@ -65,7 +65,7 @@ extern "C" {
 #define MAX_FW_SIZE					    (256 * 1024)
 #define MICROCHIP_SST_FLASH             0xBF
 
-#define DEBUG
+// #define DEBUG
 #ifdef DEBUG
 #define DEBUGPRINT(...) printf("DEBUGINFO: " __VA_ARGS__)
 #else
