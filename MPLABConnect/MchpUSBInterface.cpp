@@ -423,7 +423,6 @@ BOOL MchpUsbSpiFlashWrite(HANDLE DevID,UINT32 StartAddr,UINT8* OutputData, UINT3
     }
 
     //Silicon Rev B0 returns a dummy byte in the beginning while rev A0 doesn't
-    //if(byBuffer[0] != MICROCHIP_SST_FLASH)
     if(byBuffer[0] != MICROCHIP_SST_FLASH && byBuffer[1] != MICROCHIP_SST_FLASH)
     {
         printf("Warning: Non-Microchip Flash are not supported. Operation might fail or have unexpected results\n");
@@ -918,9 +917,7 @@ static int usb_get_hub_list(char *pHubInfoList)
 {
 	int cnt = 0,i = 0, error=0, port_cnt = 0, nportcnt = 0;
 	libusb_device **devs;
-	//libusb_device_handle *handle;
 	libusb_device_descriptor desc;
-//	PHINFO pHubListHead = pHubInfoList;	// Pointer to head of the list
 	uint8_t port_list[7];
 
 	*pHubInfoList = '\0';
@@ -967,7 +964,7 @@ static int usb_get_hub_list(char *pHubInfoList)
 			memset(dbgmsg,0,50);
 
 			sprintf(pHubInfoList,"%sVID:PID = %04x:%04x", pHubInfoList, desc.idVendor, desc.idProduct);
-			//pirintf("VID:PID = %04x:%04x", desc.idVendor, desc.idProduct);
+
 			for(int j = 0; j < port_cnt; j++)
 			{
 
