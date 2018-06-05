@@ -62,10 +62,10 @@ extern "C" {
 #define MY_MAX_PATH   					1024*8
 #define MAX_HUBS 						20
 #define CTRL_TIMEOUT 					(5*1000) /* milliseconds */
-#define MAX_FW_SIZE					    (256 * 1024)
+#define MAX_FW_SIZE					    ((256 + 8) * 1024) //256 KB Firmware + 8KB Pseudo OTP space
 #define MICROCHIP_SST_FLASH             0xBF
 
-// #define DEBUG
+// #define DEBUG        //Uncomment this line to enable Debugging
 #ifdef DEBUG
 #define DEBUGPRINT(...) printf("DEBUGINFO: " __VA_ARGS__)
 #else
